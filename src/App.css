@@ -1,0 +1,12 @@
+.app-feedback {
+  position: fixed;
+  right: 10px;
+  bottom: 20px;
+  background-color: #ffc233;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.ant-popover-inner-content {
+  padding: 0 !important;
+}
