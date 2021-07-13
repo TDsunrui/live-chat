@@ -1,6 +1,6 @@
-import React, { useRef, useState } from 'react';
-import Chat, { Bubble, useMessages, LocaleProvider, ListItem } from '@chatui/core';
-import { Menu, Dropdown } from 'antd';
+import React, { useMemo, useRef, useState } from 'react';
+import Chat, { Bubble, useMessages, LocaleProvider, ListItem, Modal, CheckboxGroup, Checkbox } from '@chatui/core';
+import { Menu, Dropdown, Row } from 'antd';
 import ClipboardJS from 'clipboard';
 
 import '@chatui/core/dist/index.css';
@@ -12,7 +12,7 @@ const ChatBox = props => {
   const toolbar = [
     { type: 'tel', title: 'Tel', icon: 'tel' },
   ];
-  const contacts = [
+  const defaultContacts = [
     { id: 1, name: 'Contact1' },
     { id: 2, name: 'Contact2' },
     { id: 3, name: 'Contact3' },
@@ -27,10 +27,22 @@ const ChatBox = props => {
   new ClipboardJS('#clipboardBtn', {
     text: () => clipboardRef.current,
   });
+  
+  const [open, setOpen] = useState(false);
 
+  const [contacts, setContacts] = useState(defaultContacts);
   const [contactId, setContactId] = useState(null);
   const [contactName, setContactName] = useState('Chat Room');
+
   const [actionId, setActionId] = useState();
+  const [actionMessage, setActionMessage] = useState();
+  const [forwardContacts, setForwardContacts] = useState([]);
+
+  const contactOptions = useMemo(() => {
+    return contacts
+      .filter(item => item.id !== contactId)
+      .map(item => ({ label: item.name, value: item.id }));
+  }, [contactId, contacts]);
 
   function renderMessageContent(msg) {
     const { type, content, _id } = msg;
@@ -114,15 +126,17 @@ const ChatBox = props => {
     resetList(JSON.parse(localStorage.getItem(id) || '[]'));
   }
 
-  function handleAction(action) {
+  function handleMenuAction(action) {
+    setActionMessage(messages.find(item => item._id === actionId));
+    
     switch (action) {
       case 'copy':
-        const { text } = messages.find(item => item._id === actionId).content;
+        const { text } = actionMessage.content;
         clipboardRef.current = text;
         document.getElementById('clipboardBtn').click();
         break;
       case 'forward':
-        console.log('forward: ', );
+        setOpen(true);
         break;
       case 'rely':
         console.log('rely: ', );
@@ -132,16 +146,20 @@ const ChatBox = props => {
       default:
         break;
     }
+  }
 
-    setActionId([]);
+  function resetAction() {
+    setActionId();
+    setActionMessage();
+    setForwardContacts([]);
   }
 
   const menu = (
     <Menu>
-      <Menu.Item key="1" onClick={() => handleAction('copy')}>Copy</Menu.Item>
-      <Menu.Item key="2" onClick={() => handleAction('forward')}>Forward</Menu.Item>
-      <Menu.Item key="3" onClick={() => handleAction('rely')}>Rely</Menu.Item>
-      <Menu.Item key="4" onClick={() => handleAction('multi')}>Multi</Menu.Item>
+      <Menu.Item key="1" onClick={() => handleMenuAction('copy')}>Copy</Menu.Item>
+      <Menu.Item key="2" onClick={() => handleMenuAction('forward')}>Forward</Menu.Item>
+      <Menu.Item key="3" onClick={() => handleMenuAction('rely')}>Rely</Menu.Item>
+      <Menu.Item key="4" onClick={() => handleMenuAction('multi')}>Multi</Menu.Item>
     </Menu>
   );
 
@@ -156,6 +174,40 @@ const ChatBox = props => {
       />
 
       <button id="clipboardBtn" data-clipboard-text="233333" hidden>2333</button>
+
+      <Modal
+        active={open}
+        title="Forward"
+        showClose={false}
+        backdrop="static"
+        actions={[
+          {
+            label: 'Confirm',
+            color: 'primary',
+            onClick: () => {
+              console.log('forward:', actionMessage, 'to:', forwardContacts);
+              setOpen(false);
+              resetAction();
+            },
+          },
+          {
+            label: 'Back',
+            onClick: () => {
+              setOpen(false);
+              resetAction();
+            },
+          },
+        ]}
+      >
+        <div style={{ padding: '0 15px' }}>
+          <CheckboxGroup
+            options={contactOptions}
+            value={forwardContacts}
+            block
+            onChange={(value) => setForwardContacts(value)}
+          />
+        </div>
+      </Modal>
 
       <div className="main-container">
         
