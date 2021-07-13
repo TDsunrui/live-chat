@@ -5,7 +5,7 @@ import '@chatui/core/dist/index.css';
 import './chatui-theme.css';
 
 const ChatBox = props => {
-  const { messages, appendMsg, setTyping } = useMessages([]);
+  const { messages, appendMsg, resetList, setTyping } = useMessages([]);
 
   const toolbar = [
     { type: 'tel', title: 'Tel', icon: 'tel' },
@@ -89,9 +89,11 @@ const ChatBox = props => {
   }
 
   function handleClickContact (item) {
+    localStorage.setItem(contactId, JSON.stringify(messages));
     const { id, name } = item;
     setContactId(id);
     setContactName(name);
+    resetList(JSON.parse(localStorage.getItem(id) || '[]'));
   }
 
   return (
