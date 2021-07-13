@@ -1,0 +1,24 @@
+:root {
+  --left-container-width: 200px;
+}
+
+.main-container {
+  display: flex;
+  height: 100%;
+}
+
+.left-container {
+  width: var(--left-container-width);
+  border-right: 1px solid var(--gray-7);
+  overflow-y: auto;
+}
+.left-item {
+  cursor: pointer;
+}
+.left-item.active, .left-item:hover {
+  background-color: var(--gray-7);
+}
+
+.right-container {
+  width: calc(100% - var(--left-container-width));
+}

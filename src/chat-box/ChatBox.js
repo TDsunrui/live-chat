@@ -1,6 +1,5 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import Chat, { Bubble, useMessages, LocaleProvider } from '@chatui/core';
-import IOClientSDK from '../client-sdk';
 
 import '@chatui/core/dist/index.css';
 import './chatui-theme.css';
@@ -8,34 +7,18 @@ import './chatui-theme.css';
 const ChatBox = props => {
   const { onClose } = props;
   const { messages, appendMsg, setTyping } = useMessages([]);
-  const socketRef = useRef();
 
   const navBar = {
     title: 'Chat Room',
     leftContent: { icon: 'close', size: 'sm', onClick: onClose },
   };
   const toolbar = [
-    { type: 'voice', title: 'Voice', icon: 'mic' },
-    { type: 'text', title: 'Text', icon: 'keyboard' },
+    { type: 'tel', title: 'Tel', icon: 'tel' },
   ];
 
-  useEffect(() => {
-    socketRef.current = new IOClientSDK({
-      root: 'ws://10.198.57.183',
-      port: 8007,
-      clientId: 'clientId',
-      username: 'user001',
-      password: '123456'
-    });
-  }, [])
+  const [inputType, setInputType] = useState('text');
 
   function handleSend(type, val) {
-    socketRef.current.emit('/root/one2one/chat/cus_9', JSON.stringify({
-      to: 'asdasd',
-      from: 'xxcvxcv'
-    }), {
-      qos: 2
-    });
     switch (type) {
       case 'text':
         if (!val.trim()) break;
@@ -89,19 +72,31 @@ const ChatBox = props => {
     }
   }
 
+  function handleToolbarClick({ type }) {
+    console.log(type)
+    setInputType(type);
+  }
+
+  function handleInputTypeChange(inputType) {
+    console.log(inputType);
+  }
+
   return (
     <LocaleProvider>
       <div className="chat-box">
         <Chat
           locale="en-US"
-          wideBreakpoint="100px"
+          wideBreakpoint="375px"
           placeholder="types"
           navbar={navBar}
           toolbar={toolbar}
+          inputType={inputType}
           messages={messages}
           renderMessageContent={renderMessageContent}
           onSend={handleSend}
           onImageSend={file => handleSend('image', file)}
+          onToolbarClick={handleToolbarClick}
+          onInputTypeChange={handleInputTypeChange}
         />
       </div>
     </LocaleProvider>
