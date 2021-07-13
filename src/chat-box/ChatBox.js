@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import Chat, { Bubble, useMessages, LocaleProvider } from '@chatui/core';
+import IOClientSDK from '../client-sdk';
 
 import '@chatui/core/dist/index.css';
 import './chatui-theme.css';
@@ -7,6 +8,7 @@ import './chatui-theme.css';
 const ChatBox = props => {
   const { onClose } = props;
   const { messages, appendMsg, setTyping } = useMessages([]);
+  const socketRef = useRef();
 
   const navBar = {
     title: 'Chat Room',
@@ -17,7 +19,23 @@ const ChatBox = props => {
     { type: 'text', title: 'Text', icon: 'keyboard' },
   ];
 
+  useEffect(() => {
+    socketRef.current = new IOClientSDK({
+      root: 'ws://10.198.57.183',
+      port: 8007,
+      clientId: 'clientId',
+      username: 'user001',
+      password: '123456'
+    });
+  }, [])
+
   function handleSend(type, val) {
+    socketRef.current.emit('/root/one2one/chat/cus_9', JSON.stringify({
+      to: 'asdasd',
+      from: 'xxcvxcv'
+    }), {
+      qos: 2
+    });
     switch (type) {
       case 'text':
         if (!val.trim()) break;

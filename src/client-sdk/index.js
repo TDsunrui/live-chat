@@ -1,4 +1,4 @@
-import mqtt from 'mqtt';
+import { connect } from 'mqtt';
 import {
   IMERROR,
   CHAT_TO,
@@ -26,15 +26,14 @@ class IOClientSDK {
 
   initialize() {
     const { root, nsp, ...otherOpts } = this.opts;
-    const url = `${root}/${nsp}`;
-    this.socket = mqtt.connect(url, {
-      path: '/', // matching with server
+    const url = `${root}`;
+    this.socket = connect(url, {
       ...otherOpts,
     });
     // pretreatment some reserved event
     // eg: connect, disconnect, error
     this._bindReservedEvent();
-    if (nsp === 'chat') this._bindChatEvent();
+  // this._bindChatEvent();
   }
 
   getSocket() {
@@ -71,7 +70,7 @@ class IOClientSDK {
   }
 
   emit(...args) {
-    return this.getSocket().emit(...args);
+    return this.getSocket().publish(...args);
   }
 
   _execQuene(eventName) {
@@ -91,20 +90,22 @@ class IOClientSDK {
     const self = this;
     socket.on('connect', (...resp) => {
       self._execQuene('connect')(...resp);
-      // feat: 拉取离线消息
-      self.emit(CHAT_PULL_OFFLINE_MESSAGE);
-      // feat: 拉取离线已读回执
-      self.emit(CHAT_PULL_READED_MESSAGE);
+      console.log('connected');
     });
 
-    socket.on('disconnect', (...resp) => {
-      self._execQuene('disconnect')(...resp);
+    socket.on('offline', (...resp) => {
+      self._execQuene('offline')(...resp);
+      console.log(...resp);
+    });
+
+    socket.on('close', (...resp) => {
+      self._execQuene('close')(...resp);
       console.log(...resp);
     });
 
     socket.on('error', (error) => {
       self._execQuene('error')(error);
-      throw new Error(`[Socket Error 500] ${error}`);
+      console.error(error);
     });
 
     socket.on(IMERROR, (error) => {
