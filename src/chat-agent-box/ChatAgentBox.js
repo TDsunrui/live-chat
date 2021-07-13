@@ -1,51 +1,43 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from "react-router-dom";
-import Chat, { Bubble, useMessages, LocaleProvider, ListItem, Modal, CheckboxGroup, Divider } from '@chatui/core';
+import Chat, { Bubble, useMessages, LocaleProvider, ListItem, Modal, CheckboxGroup, Divider, Tag } from '@chatui/core';
 import { Menu, Dropdown } from 'antd';
 import ClipboardJS from 'clipboard';
 
-import { CHAT_TO, CHAT_ONLINE, CHAT_MESSAGE, IMERROR, CHAT_TO_ACK } from '../client-sdk/constant';
+import { CHAT_TO, CHAT_ONLINE, CHAT_MESSAGE, IMERROR, CHAT_TO_ACK, CHAT_TO_UNDO, CHAT_TO_READED } from '../client-sdk/constant';
 import IOClientSDK from '../client-sdk';
 import { createMsgProtocal } from '../client-sdk/protocal';
 
 import '@chatui/core/dist/index.css';
 import './chatui-theme.css';
 
-const MsgType = {
-  1: 'text',
-  2: 'image',
-}
-
 const ChatBox = props => {
   const { uid } = useParams();
   
-  const { messages, appendMsg, resetList, setTyping } = useMessages([]);
+  const { messages, appendMsg, updateMsg, deleteMsg, resetList } = useMessages([]);
 
   const toolbar = [
     { type: 'tel', title: 'Tel', icon: 'tel' },
-  ];
-  const defaultContacts = [
-    { id: '60ed31e0aaa19b57e13e20ca', name: 'Contact1' },
-    { id: 2, name: 'Contact2' },
-    { id: 3, name: 'Contact3' },
-    { id: 4, name: 'Contact4' },
-    { id: 5, name: 'Contact5' },
-    { id: 6, name: 'Contact6' },
   ];
   
   const socketRef = useRef();
   const audioRef = useRef();
   const clipboardRef = useRef();
+  const messagesRef = useRef();
+  messagesRef.current = messages;
 
   new ClipboardJS('#clipboardBtn', {
     text: () => clipboardRef.current,
   });
   
   const [open, setOpen] = useState(false);
-
-  const [contacts, setContacts] = useState(defaultContacts);
-  const [contactId, setContactId] = useState(defaultContacts[0]?.id);
-  const [contactName, setContactName] = useState('Chat Room');
+  const [contacts, setContacts] = useState([
+    { _id: '60ed3176aaa19b57e13e20af', name: 'User' },
+    { _id: '60ed3176aaa19b57e13e20ae', name: 'Administrator' },
+    { _id: '60ed31e0aaa19b57e13e20ca', name: 'User1' },
+  ]);
+  const [contactId, setContactId] = useState('60ed31e0aaa19b57e13e20ca');
+  const [contactName, setContactName] = useState('User1');
 
   const [actionId, setActionId] = useState();
   const [actionMessage, setActionMessage] = useState();
@@ -58,14 +50,26 @@ const ChatBox = props => {
       .map(item => ({ label: item.name, value: item.id }));
   }, [contactId, contacts]);
 
-  function renderMessageContent(msg) {
-    const { type, content, user, _id } = msg;
+  function renderMessageContent(item) {
+    const { content: { content, type, readed = [] }, position, user, _id } = item;
 
     switch (type) {
       case 1:
         return (
-          <Dropdown overlay={menu} trigger={['contextMenu']} onContextMenu={() => setActionId(_id)}>
-            <div>
+          <Dropdown overlay={genMenu(position)} trigger={['contextMenu']} onContextMenu={() => setActionId(_id)}>
+            <div style={{ position: 'relative' }}>
+              {position === 'right' && (
+                <Tag
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '-20px',
+                    transform: 'translateY(-50%)'
+                }}>
+                  {readed.length > 0 ? 'readed' : 'unread'}
+                </Tag>
+              )}
+              
               <Bubble>
                 {content}
                 {user.replyMessage && (
@@ -79,59 +83,78 @@ const ChatBox = props => {
           </Dropdown>
           );
       case 2:
-      return (
-        <Dropdown overlay={menu} trigger={['contextMenu']} onContextMenu={() => setActionId(_id)}>
-          <div>
-            <Bubble type="image">
-              <img src={content} alt="" />
-            </Bubble>
+        return (
+          <Dropdown overlay={genMenu(position)} trigger={['contextMenu']} onContextMenu={() => setActionId(_id)}>
+            <div style={{ position: 'relative' }}>
+              {position === 'right' && (
+                <Tag
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '-20px',
+                    transform: 'translateY(-50%)'
+                }}>
+                  {readed.length > 0 ? 'readed' : 'unread'}
+                </Tag>
+              )}
+              
+              <Bubble type="image">
+                <img src={content} alt="" />
+              </Bubble>
+            </div>
+          </Dropdown>
+        );
+      case 10:
+      case 21:
+        return (
+          <div style={{width: '100%'}}>
+            <Divider>{content}</Divider>
           </div>
-        </Dropdown>
-      );
+        );
       default:
         return null;
     }
   }
 
   function handleSend(type, val) {
-    audioRef.current.play();
-    let msg;
+    let content;
     
     switch (type) {
       case 'text':
         if (!val.trim()) break;
 
-        msg = createMsgProtocal({
+        content = createMsgProtocal({
           type: 1,
           from: uid,
           to: contactId,
           content: val,
         });
-        socketRef.current.emit(CHAT_TO, msg);
+        socketRef.current.emit(CHAT_TO, content);
 
         appendMsg({
-          ...msg,
-          // type: 'text',
-          // content: { text: val },
+          type: 'text',
+          content,
           // user: { replyMessage },
           position: 'right',
+          _id: content.fp
         });
+
         break;
       case 'image':
-        msg = createMsgProtocal({
+        content = createMsgProtocal({
           type: 2,
           from: uid,
           to: contactId,
           content: 'https://gimg2.baidu.com/image_search/src=http%3A%2F%2Fhbimg.b0.upaiyun.com%2F7f6dec72221bb589a322e9455d8bb5401ee5552269aa-BdmvBK_fw658&refer=http%3A%2F%2Fhbimg.b0.upaiyun.com&app=2002&size=f9999,10000&q=a80&n=0&g=0n&fmt=jpeg?sec=1628655638&t=89bebf53eb33e14aa430a72443259c3a',
         });
-        socketRef.current.emit(CHAT_TO, msg);
+        socketRef.current.emit(CHAT_TO, content);
 
         appendMsg({
-          ...msg,
-          // type: 'text',
-          // content: { text: val },
+          type: 'image',
+          content,
           // user: { replyMessage },
           position: 'right',
+          _id: content.fp
         });
         break;
       default:
@@ -148,9 +171,10 @@ const ChatBox = props => {
   }
 
   function handleClickContact(item) {
+    console.log(item)
     localStorage.setItem(contactId, JSON.stringify(messages));
-    const { id, name } = item;
-    setContactId(id);
+    const { _id, name } = item;
+    setContactId(_id);
     setContactName(name);
   }
 
@@ -160,14 +184,18 @@ const ChatBox = props => {
     
     switch (action) {
       case 'copy':
-        clipboardRef.current = curActionMessage.content;
+        clipboardRef.current = curActionMessage.content.content;
         document.getElementById('clipboardBtn').click();
         break;
       case 'forward':
         setOpen(true);
         break;
       case 'reply':
-        setReplyMessage(curActionMessage.content);
+        setReplyMessage(curActionMessage.content.content);
+        break;
+      case 'recall':
+        socketRef.current.emit(CHAT_TO_UNDO, curActionMessage.content);
+        deleteMsg(actionId);
         break;
       case 'multi':
         break;
@@ -181,6 +209,18 @@ const ChatBox = props => {
     setActionMessage();
     setForwardContacts([]);
   }
+
+  function genMenu(position) {
+    return (
+      <Menu>
+        <Menu.Item key="1" onClick={() => handleMenuAction('copy')}>Copy</Menu.Item>
+        {/* <Menu.Item key="2" onClick={() => handleMenuAction('forward')}>Forward</Menu.Item> */}
+        {/* <Menu.Item key="3" onClick={() => handleMenuAction('reply')}>Reply</Menu.Item> */}
+        {position === 'right' && <Menu.Item key="4" onClick={() => handleMenuAction('recall')}>Recall</Menu.Item>}
+        {/* <Menu.Item key="5" onClick={() => handleMenuAction('multi')}>Multi</Menu.Item> */}
+      </Menu>
+    );
+  };
 
   useEffect(() => {
     socketRef.current = new IOClientSDK({
@@ -199,16 +239,37 @@ const ChatBox = props => {
 
     const event1 = socketRef.current.on(CHAT_ONLINE, (resp) => {
       console.log('我上线啦~', resp);
+      const clients = resp.data.payload.clients.filter(item => item._id !== uid);
+      console.log(clients);
+      // setContacts();
+      // setContactId(clients[0]._id);
+      // setContactName(clients[0].name);
     });
 
     const event2 = socketRef.current.on(CHAT_MESSAGE, (resp) => {
+      audioRef.current.play();
       console.log('收到的消息', resp);
-      const payload = resp.data.payload;
-      appendMsg(payload);
+      const content = resp.data.payload;
+      if ([10, 21].includes(content.type)) {
+        deleteMsg(content.fp);
+      }
+      appendMsg({ content, _id: content.fp });
+      socketRef.current.emit(CHAT_TO_READED, resp.data.payload);
     });
 
     const event3 = socketRef.current.on(CHAT_TO_ACK, (resp) => {
       console.log('发送成功~', resp);
+    });
+
+    const event7 = socketRef.current.on(CHAT_TO_READED, (resp) => {
+      console.log(resp, '读了我的消息');
+      const result = resp.data.payload;
+      result.forEach((msg) => {
+        const findedMsg = messagesRef.current.find(item => item._id === msg.fp);
+        if (!findedMsg) return;
+        const content =  { ...findedMsg.content, readed: msg.readed }
+        updateMsg(msg.fp, { ...findedMsg, content });
+      })
     });
 
     return function cleanup() {
@@ -216,21 +277,13 @@ const ChatBox = props => {
       event1();
       event2();
       event3();
+      event7();
     }
-  } ,[appendMsg, uid]);
+  } ,[appendMsg, deleteMsg, uid, updateMsg]);
 
   useEffect(() => {
     resetList(JSON.parse(localStorage.getItem(contactId) || '[]'));
   }, [contactId, resetList]);
-
-  const menu = (
-    <Menu>
-      <Menu.Item key="1" onClick={() => handleMenuAction('copy')}>Copy</Menu.Item>
-      <Menu.Item key="2" onClick={() => handleMenuAction('forward')}>Forward</Menu.Item>
-      <Menu.Item key="3" onClick={() => handleMenuAction('reply')}>Reply</Menu.Item>
-      <Menu.Item key="4" onClick={() => handleMenuAction('multi')}>Multi</Menu.Item>
-    </Menu>
-  );
 
   return (
     <LocaleProvider>
@@ -242,7 +295,7 @@ const ChatBox = props => {
         hidden
       />
 
-      <button id="clipboardBtn" data-clipboard-text="233333" hidden>2333</button>
+      <button id="clipboardBtn" hidden></button>
 
       <Modal
         active={open}
@@ -285,8 +338,8 @@ const ChatBox = props => {
 
           {contacts.map(item => (
             <ListItem
-              className={`left-item ${contactId === item.id ? 'active' : ''}`}
-              key={item.id}
+              className={`left-item ${contactId === item._id ? 'active' : ''}`}
+              key={item._id}
               content={item.name}
               onClick={() => handleClickContact(item)}
             />

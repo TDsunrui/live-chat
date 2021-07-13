@@ -1,24 +1,184 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from "react-router-dom";
-import Chat, { Bubble, useMessages, LocaleProvider } from '@chatui/core';
+import Chat, { Bubble, useMessages, LocaleProvider, Divider, Tag } from '@chatui/core';
+import { Dropdown, Menu } from 'antd';
+import ClipboardJS from 'clipboard';
 
-import { CHAT_TO, CHAT_ONLINE, CHAT_MESSAGE, IMERROR, CHAT_TO_ACK, CHAT_PULL_RECENT_CONVERSATION, CHAT_PULL_OFFLINE_MESSAGE, CHAT_PULL_HISTORY_MESSAGE, CHAT_TO_READED, CHAT_GROUP_NOTICE, CHAT_TO_TYPING, CHAT_TO_UNDO } from '../client-sdk/constant';
+import { CHAT_TO, CHAT_ONLINE, CHAT_MESSAGE, IMERROR, CHAT_TO_ACK, CHAT_TO_UNDO, CHAT_TO_READED } from '../client-sdk/constant';
 import IOClientSDK from '../client-sdk';
 import { createMsgProtocal } from '../client-sdk/protocal';
 
 import '@chatui/core/dist/index.css';
 import './chatui-theme.css';
 
-const MsgType = {
-  1: 'text',
-  2: 'image',
-}
-
 const ChatBox = props => {
   const { uid } = useParams();
   const { onClose } = props;
-  const { messages, appendMsg, setTyping } = useMessages([]);
+  const { messages, appendMsg, updateMsg, deleteMsg } = useMessages([]);
+
   const socketRef = useRef();
+  const audioRef = useRef();
+  const clipboardRef = useRef();
+  const messagesRef = useRef();
+  messagesRef.current = messages;
+
+  new ClipboardJS('#clipboardBtn', {
+    text: () => clipboardRef.current,
+  });
+
+  const navBar = {
+    title: 'Chat Room',
+    leftContent: { icon: 'close', size: 'sm', onClick: onClose },
+  };
+  const toolbar = [
+    { type: 'tel', title: 'Tel', icon: 'tel' },
+  ];
+
+  const [actionId, setActionId] = useState();
+  const [replyMessage, setReplyMessage] = useState();
+
+  function renderMessageContent(item) {
+    const { content: { content, type, readed = [] }, position, _id } = item;
+
+    switch (type) {
+      case 1:
+        return (
+          <Dropdown overlay={genMenu(position)} trigger={['contextMenu']} onContextMenu={() => setActionId(_id)}>
+            <div style={{ position: 'relative' }}>
+              {position === 'right' && (
+                <Tag
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '-20px',
+                    transform: 'translateY(-50%)'
+                }}>
+                  {readed.length > 0 ? 'readed' : 'unread'}
+                </Tag>
+              )}
+
+              <Bubble content={content} />
+            </div>
+          </Dropdown>
+        );
+      case 2:
+        return (
+          <Dropdown overlay={genMenu(position)} trigger={['contextMenu']} onContextMenu={() => setActionId(_id)}>
+            <div style={{ position: 'relative' }}>
+              {position === 'right' && (
+                <Tag
+                  style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '-20px',
+                    transform: 'translateY(-50%)'
+                }}>
+                  {readed.length > 0 ? 'readed' : 'unread'}
+                </Tag>
+              )}
+              
+              <Bubble type="image">
+                <img src={content} alt="" />
+              </Bubble>
+            </div>
+          </Dropdown>
+        );
+      case 10:
+      case 21:
+        return (
+          <div style={{width: '100%'}}>
+            <Divider>{content}</Divider>
+          </div>
+        );
+      default:
+        return null;
+    }
+  }
+
+  function handleSend(type, val) {
+    let content;
+    
+    switch (type) {
+      case 'text':
+        if (!val.trim()) break;
+        
+        content = createMsgProtocal({
+          type: 1,
+          from: uid,
+          to: '60ed320faaa19b57e13e20e1',
+          content: val,
+        });
+        socketRef.current.emit(CHAT_TO, content);
+
+        appendMsg({
+          content,
+          type: 'text',
+          position: 'right',
+          _id: content.fp,
+        });
+  
+        break;
+      case 'image':
+        content = createMsgProtocal({
+          type: 2,
+          from: uid,
+          to: '60ed320faaa19b57e13e20e1',
+          content: 'https://gimg2.baidu.com/image_search/src=http%3A%2F%2Fhbimg.b0.upaiyun.com%2F7f6dec72221bb589a322e9455d8bb5401ee5552269aa-BdmvBK_fw658&refer=http%3A%2F%2Fhbimg.b0.upaiyun.com&app=2002&size=f9999,10000&q=a80&n=0&g=0n&fmt=jpeg?sec=1628655638&t=89bebf53eb33e14aa430a72443259c3a',
+        });
+        socketRef.current.emit(CHAT_TO, content);
+
+        appendMsg({
+          content,
+          type: 'image',
+          position: 'right',
+          _id: content.fp
+        });
+        break;
+      default:
+        break;
+    }
+  }
+
+  function handleToolbarClick({ type }) {
+    console.log('handleToolbarClick', type);
+  }
+
+  function handleInputTypeChange(inputType) {
+    console.log('handleInputTypeChange', inputType);
+  }
+
+  function handleMenuAction(action) {
+    const curActionMessage = messages.find(item => item._id === actionId);
+    
+    switch (action) {
+      case 'copy':
+        clipboardRef.current = curActionMessage.content.content;
+        document.getElementById('clipboardBtn').click();
+        break;
+      case 'reply':
+        setReplyMessage(curActionMessage.content.content);
+        break;
+      case 'recall':
+        socketRef.current.emit(CHAT_TO_UNDO, curActionMessage.content);
+        deleteMsg(actionId);
+        break;
+      case 'multi':
+        break;
+      default:
+        break;
+    }
+  }
+
+  function genMenu(position) {
+    return (
+      <Menu>
+        <Menu.Item key="1" onClick={() => handleMenuAction('copy')}>Copy</Menu.Item>
+        {/* <Menu.Item key="3" onClick={() => handleMenuAction('reply')}>Reply</Menu.Item> */}
+        {position === 'right' && <Menu.Item key="4" onClick={() => handleMenuAction('recall')}>Recall</Menu.Item>}
+        {/* <Menu.Item key="5" onClick={() => handleMenuAction('multi')}>Multi</Menu.Item> */}
+      </Menu>
+    );
+  };
 
   useEffect(() => {
     socketRef.current = new IOClientSDK({
@@ -40,13 +200,29 @@ const ChatBox = props => {
     });
 
     const event2 = socketRef.current.on(CHAT_MESSAGE, (resp) => {
+      audioRef.current.play();
       console.log('收到的消息', resp);
-      const payload = resp.data.payload;
-      appendMsg(payload);
+      const content = resp.data.payload;
+      if ([10, 21].includes(content.type)) {
+        deleteMsg(content.fp);
+      }
+      appendMsg({ content, _id: content.fp });
+      socketRef.current.emit(CHAT_TO_READED, resp.data.payload);
     });
 
     const event3 = socketRef.current.on(CHAT_TO_ACK, (resp) => {
       console.log('发送成功~', resp);
+    });
+
+    const event7 = socketRef.current.on(CHAT_TO_READED, (resp) => {
+      console.log(resp, '读了我的消息');
+      const result = resp.data.payload;
+      result.forEach((msg) => {
+        const findedMsg = messagesRef.current.find(item => item._id === msg.fp);
+        if (!findedMsg) return;
+        const content =  { ...findedMsg.content, readed: msg.readed }
+        updateMsg(msg.fp, { ...findedMsg, content });
+      })
     });
 
     return function cleanup() {
@@ -54,94 +230,29 @@ const ChatBox = props => {
       event1();
       event2();
       event3();
+      event7();
     }
-  } ,[]);
-
-  const navBar = {
-    title: 'Chat Room',
-    leftContent: { icon: 'close', size: 'sm', onClick: onClose },
-  };
-  const toolbar = [
-    { type: 'tel', title: 'Tel', icon: 'tel' },
-  ];
-
-  const [inputType, setInputType] = useState('text');
-
-  function handleSend(type, val) {
-    let msg;
-    
-    switch (type) {
-      case 'text':
-        if (!val.trim()) break;
-        
-        msg = createMsgProtocal({
-          type: 1,
-          from: uid,
-          to: '60ed320faaa19b57e13e20e1',
-          content: val,
-        });
-        socketRef.current.emit(CHAT_TO, msg);
-
-        appendMsg({
-          ...msg,
-          position: 'right',
-        });
-  
-        break;
-      case 'image':
-        msg = createMsgProtocal({
-          type: 2,
-          from: uid,
-          to: '60ed320faaa19b57e13e20e1',
-          content: 'https://gimg2.baidu.com/image_search/src=http%3A%2F%2Fhbimg.b0.upaiyun.com%2F7f6dec72221bb589a322e9455d8bb5401ee5552269aa-BdmvBK_fw658&refer=http%3A%2F%2Fhbimg.b0.upaiyun.com&app=2002&size=f9999,10000&q=a80&n=0&g=0n&fmt=jpeg?sec=1628655638&t=89bebf53eb33e14aa430a72443259c3a',
-        });
-        socketRef.current.emit(CHAT_TO, msg);
-
-        appendMsg({
-          ...msg,
-          position: 'right',
-        });
-        break;
-      default:
-        break;
-    }
-  }
-
-  function renderMessageContent(msg) {
-    const { type, content } = msg;
-    switch (type) {
-      case 1:
-        return <Bubble content={content} />;
-      case 2:
-        return (
-          <Bubble type="image">
-            <img src={content} alt="" />
-          </Bubble>
-        );
-      default:
-        return null;
-    }
-  }
-
-  function handleToolbarClick({ type }) {
-    console.log(type)
-    setInputType(type);
-  }
-
-  function handleInputTypeChange(inputType) {
-    console.log(inputType);
-  }
+  } ,[appendMsg, deleteMsg, uid, updateMsg]);
 
   return (
     <LocaleProvider>
+      <audio
+        ref={audioRef}
+        id="audioId"
+        src="https://img.tukuppt.com/newpreview_music/09/00/76/5c894b095237f81946.mp3"
+        preload="auto"
+        hidden
+      />
+
+      <button id="clipboardBtn" hidden></button>
+      
       <div className="chat-box">
         <Chat
-          locale="en-US"
           wideBreakpoint="375px"
+          locale="en-US"
           placeholder="types"
           navbar={navBar}
           toolbar={toolbar}
-          inputType={inputType}
           messages={messages}
           renderMessageContent={renderMessageContent}
           onSend={handleSend}
