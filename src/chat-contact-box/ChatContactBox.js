@@ -1,5 +1,7 @@
 import React, { useRef, useState } from 'react';
 import Chat, { Bubble, useMessages, LocaleProvider, ListItem } from '@chatui/core';
+import { Menu, Dropdown } from 'antd';
+import ClipboardJS from 'clipboard';
 
 import '@chatui/core/dist/index.css';
 import './chatui-theme.css';
@@ -20,21 +22,37 @@ const ChatBox = props => {
   ];
   
   const audioRef = useRef();
+  const clipboardRef = useRef();
+
+  new ClipboardJS('#clipboardBtn', {
+    text: () => clipboardRef.current,
+  });
 
   const [contactId, setContactId] = useState(null);
   const [contactName, setContactName] = useState('Chat Room');
+  const [actionId, setActionId] = useState();
 
   function renderMessageContent(msg) {
-    const { type, content } = msg;
+    const { type, content, _id } = msg;
 
     switch (type) {
       case 'text':
-        return <Bubble content={content.text} />;
-      case 'image':
         return (
-          <Bubble type="image">
-            <img src={content.picUrl} alt="" />
-          </Bubble>
+          <Dropdown overlay={menu} trigger={['contextMenu']} onContextMenu={handleContextMenu}>
+            <div id={_id}>
+              <Bubble content={content.text} />
+            </div>
+          </Dropdown>
+          );
+        case 'image':
+        return (
+          <Dropdown overlay={menu} trigger={['contextMenu']} onContextMenu={handleContextMenu}>
+            <div id={_id}>
+              <Bubble type="image">
+                <img src={content.picUrl} alt="" />
+              </Bubble>
+            </div>
+          </Dropdown>
         );
       default:
         return null;
@@ -81,20 +99,64 @@ const ChatBox = props => {
   }
 
   function handleToolbarClick({ type }) {
-    console.log(type);
+    console.log('handleToolbarClick', type);
   }
 
   function handleInputTypeChange(inputType) {
-    console.log(inputType);
+    console.log('handleInputTypeChange', inputType);
   }
 
-  function handleClickContact (item) {
+  function handleClickContact(item) {
     localStorage.setItem(contactId, JSON.stringify(messages));
     const { id, name } = item;
     setContactId(id);
     setContactName(name);
     resetList(JSON.parse(localStorage.getItem(id) || '[]'));
   }
+
+  function getMessageId(elem) {
+    while (elem && elem.nodeType !== 9) {
+      if (elem.className.includes('ant-dropdown-trigger')) {
+        return elem.id;
+      };
+      return getMessageId(elem.parentNode);
+    }
+  }
+
+  function handleContextMenu(e) {
+    setActionId(getMessageId(e.target));
+  }
+
+  function handleAction(action) {
+    switch (action) {
+      case 'copy':
+        const { text } = messages.find(item => item._id === actionId).content;
+        clipboardRef.current = text;
+        document.getElementById('clipboardBtn').click();
+        break;
+      case 'forward':
+        console.log('forward: ', );
+        break;
+      case 'rely':
+        console.log('rely: ', );
+        break;
+      case 'multi':
+        break;
+      default:
+        break;
+    }
+
+    setActionId([]);
+  }
+
+  const menu = (
+    <Menu>
+      <Menu.Item key="1" onClick={() => handleAction('copy')}>Copy</Menu.Item>
+      <Menu.Item key="2" onClick={() => handleAction('forward')}>Forward</Menu.Item>
+      <Menu.Item key="3" onClick={() => handleAction('rely')}>Rely</Menu.Item>
+      <Menu.Item key="4" onClick={() => handleAction('multi')}>Multi</Menu.Item>
+    </Menu>
+  );
 
   return (
     <LocaleProvider>
@@ -105,6 +167,8 @@ const ChatBox = props => {
         preload="auto"
         hidden
       />
+
+      <button id="clipboardBtn" data-clipboard-text="233333" hidden>2333</button>
 
       <div className="main-container">
         
