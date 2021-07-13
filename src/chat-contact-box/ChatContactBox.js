@@ -1,6 +1,6 @@
-import React, { useMemo, useRef, useState } from 'react';
-import Chat, { Bubble, useMessages, LocaleProvider, ListItem, Modal, CheckboxGroup, Checkbox } from '@chatui/core';
-import { Menu, Dropdown, Row } from 'antd';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import Chat, { Bubble, useMessages, LocaleProvider, ListItem, Modal, CheckboxGroup, Divider } from '@chatui/core';
+import { Menu, Dropdown } from 'antd';
 import ClipboardJS from 'clipboard';
 
 import '@chatui/core/dist/index.css';
@@ -31,12 +31,13 @@ const ChatBox = props => {
   const [open, setOpen] = useState(false);
 
   const [contacts, setContacts] = useState(defaultContacts);
-  const [contactId, setContactId] = useState(null);
+  const [contactId, setContactId] = useState(defaultContacts[0]?.id);
   const [contactName, setContactName] = useState('Chat Room');
 
   const [actionId, setActionId] = useState();
   const [actionMessage, setActionMessage] = useState();
   const [forwardContacts, setForwardContacts] = useState([]);
+  const [replyMessage, setReplyMessage] = useState();
 
   const contactOptions = useMemo(() => {
     return contacts
@@ -45,14 +46,22 @@ const ChatBox = props => {
   }, [contactId, contacts]);
 
   function renderMessageContent(msg) {
-    const { type, content, _id } = msg;
+    const { type, content, user, _id } = msg;
 
     switch (type) {
       case 'text':
         return (
           <Dropdown overlay={menu} trigger={['contextMenu']} onContextMenu={() => setActionId(_id)}>
             <div>
-              <Bubble content={content.text} />
+              <Bubble>
+                {content.text}
+                {user.replyMessage && (
+                  <>
+                    <Divider/>
+                    Reply to: {user.replyMessage}
+                  </>
+                )}
+              </Bubble>
             </div>
           </Dropdown>
           );
@@ -82,6 +91,7 @@ const ChatBox = props => {
           type: 'text',
           content: { text: val },
           position: 'right',
+          user: { replyMessage },
         });
   
         setTyping(true);
@@ -91,11 +101,10 @@ const ChatBox = props => {
             type: 'text',
             content: { text: 'Bala bala' },
           });
+          setReplyMessage();
         }, 1000);
         break;
       case 'image':
-        console.log('file: ', val);
-        
         setTyping(true);
 
         setTimeout(() => {
@@ -123,23 +132,22 @@ const ChatBox = props => {
     const { id, name } = item;
     setContactId(id);
     setContactName(name);
-    resetList(JSON.parse(localStorage.getItem(id) || '[]'));
   }
 
   function handleMenuAction(action) {
-    setActionMessage(messages.find(item => item._id === actionId));
+    const curActionMessage = messages.find(item => item._id === actionId);
+    setActionMessage(curActionMessage);
     
     switch (action) {
       case 'copy':
-        const { text } = actionMessage.content;
-        clipboardRef.current = text;
+        clipboardRef.current = curActionMessage.content.text;
         document.getElementById('clipboardBtn').click();
         break;
       case 'forward':
         setOpen(true);
         break;
-      case 'rely':
-        console.log('rely: ', );
+      case 'reply':
+        setReplyMessage(curActionMessage.content.text);
         break;
       case 'multi':
         break;
@@ -154,11 +162,15 @@ const ChatBox = props => {
     setForwardContacts([]);
   }
 
+  useEffect(() => {
+    resetList(JSON.parse(localStorage.getItem(contactId) || '[]'));
+  }, [contactId, resetList]);
+
   const menu = (
     <Menu>
       <Menu.Item key="1" onClick={() => handleMenuAction('copy')}>Copy</Menu.Item>
       <Menu.Item key="2" onClick={() => handleMenuAction('forward')}>Forward</Menu.Item>
-      <Menu.Item key="3" onClick={() => handleMenuAction('rely')}>Rely</Menu.Item>
+      <Menu.Item key="3" onClick={() => handleMenuAction('reply')}>Reply</Menu.Item>
       <Menu.Item key="4" onClick={() => handleMenuAction('multi')}>Multi</Menu.Item>
     </Menu>
   );
