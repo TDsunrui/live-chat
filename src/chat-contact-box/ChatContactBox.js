@@ -38,16 +38,16 @@ const ChatBox = props => {
     switch (type) {
       case 'text':
         return (
-          <Dropdown overlay={menu} trigger={['contextMenu']} onContextMenu={handleContextMenu}>
-            <div id={_id}>
+          <Dropdown overlay={menu} trigger={['contextMenu']} onContextMenu={() => setActionId(_id)}>
+            <div>
               <Bubble content={content.text} />
             </div>
           </Dropdown>
           );
         case 'image':
         return (
-          <Dropdown overlay={menu} trigger={['contextMenu']} onContextMenu={handleContextMenu}>
-            <div id={_id}>
+          <Dropdown overlay={menu} trigger={['contextMenu']} onContextMenu={() => setActionId(_id)}>
+            <div>
               <Bubble type="image">
                 <img src={content.picUrl} alt="" />
               </Bubble>
@@ -112,19 +112,6 @@ const ChatBox = props => {
     setContactId(id);
     setContactName(name);
     resetList(JSON.parse(localStorage.getItem(id) || '[]'));
-  }
-
-  function getMessageId(elem) {
-    while (elem && elem.nodeType !== 9) {
-      if (elem.className.includes('ant-dropdown-trigger')) {
-        return elem.id;
-      };
-      return getMessageId(elem.parentNode);
-    }
-  }
-
-  function handleContextMenu(e) {
-    setActionId(getMessageId(e.target));
   }
 
   function handleAction(action) {
