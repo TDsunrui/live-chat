@@ -22,7 +22,7 @@ const ChatBox = props => {
 
   useEffect(() => {
     socketRef.current = new IOClientSDK({
-      root: 'http://localhost:7001',
+      root: 'http://10.198.62.218:7001',
       nsp: 'chat',
       query: {
         token: global.localStorage.getItem('token'),
@@ -68,12 +68,13 @@ const ChatBox = props => {
   const [inputType, setInputType] = useState('text');
 
   function handleSend(type, val) {
+    let msg;
+    
     switch (type) {
       case 'text':
         if (!val.trim()) break;
-        setTyping(true);
         
-        const msg = createMsgProtocal({
+        msg = createMsgProtocal({
           type: 1,
           from: uid,
           to: '60ed320faaa19b57e13e20e1',
@@ -88,16 +89,18 @@ const ChatBox = props => {
   
         break;
       case 'image':
-        console.log('file: ', val);
-        
-        setTyping(true);
+        msg = createMsgProtocal({
+          type: 2,
+          from: uid,
+          to: '60ed320faaa19b57e13e20e1',
+          content: 'https://gimg2.baidu.com/image_search/src=http%3A%2F%2Fhbimg.b0.upaiyun.com%2F7f6dec72221bb589a322e9455d8bb5401ee5552269aa-BdmvBK_fw658&refer=http%3A%2F%2Fhbimg.b0.upaiyun.com&app=2002&size=f9999,10000&q=a80&n=0&g=0n&fmt=jpeg?sec=1628655638&t=89bebf53eb33e14aa430a72443259c3a',
+        });
+        socketRef.current.emit(CHAT_TO, msg);
 
-        // setTimeout(() => {
-        //   appendMsg({
-        //     type: 'image',
-        //     content: { picUrl: 'https://gimg2.baidu.com/image_search/src=http%3A%2F%2Fhbimg.b0.upaiyun.com%2F7f6dec72221bb589a322e9455d8bb5401ee5552269aa-BdmvBK_fw658&refer=http%3A%2F%2Fhbimg.b0.upaiyun.com&app=2002&size=f9999,10000&q=a80&n=0&g=0n&fmt=jpeg?sec=1628655638&t=89bebf53eb33e14aa430a72443259c3a' }
-        //   });
-        // }, 1000);
+        appendMsg({
+          ...msg,
+          position: 'right',
+        });
         break;
       default:
         break;
@@ -112,7 +115,7 @@ const ChatBox = props => {
       case 2:
         return (
           <Bubble type="image">
-            <img src={content.picUrl} alt="" />
+            <img src={content} alt="" />
           </Bubble>
         );
       default:

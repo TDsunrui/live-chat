@@ -1,19 +1,31 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useParams } from "react-router-dom";
 import Chat, { Bubble, useMessages, LocaleProvider, ListItem, Modal, CheckboxGroup, Divider } from '@chatui/core';
 import { Menu, Dropdown } from 'antd';
 import ClipboardJS from 'clipboard';
 
+import { CHAT_TO, CHAT_ONLINE, CHAT_MESSAGE, IMERROR, CHAT_TO_ACK } from '../client-sdk/constant';
+import IOClientSDK from '../client-sdk';
+import { createMsgProtocal } from '../client-sdk/protocal';
+
 import '@chatui/core/dist/index.css';
 import './chatui-theme.css';
 
+const MsgType = {
+  1: 'text',
+  2: 'image',
+}
+
 const ChatBox = props => {
+  const { uid } = useParams();
+  
   const { messages, appendMsg, resetList, setTyping } = useMessages([]);
 
   const toolbar = [
     { type: 'tel', title: 'Tel', icon: 'tel' },
   ];
   const defaultContacts = [
-    { id: 1, name: 'Contact1' },
+    { id: '60ed31e0aaa19b57e13e20ca', name: 'Contact1' },
     { id: 2, name: 'Contact2' },
     { id: 3, name: 'Contact3' },
     { id: 4, name: 'Contact4' },
@@ -21,6 +33,7 @@ const ChatBox = props => {
     { id: 6, name: 'Contact6' },
   ];
   
+  const socketRef = useRef();
   const audioRef = useRef();
   const clipboardRef = useRef();
 
@@ -49,12 +62,12 @@ const ChatBox = props => {
     const { type, content, user, _id } = msg;
 
     switch (type) {
-      case 'text':
+      case 1:
         return (
           <Dropdown overlay={menu} trigger={['contextMenu']} onContextMenu={() => setActionId(_id)}>
             <div>
               <Bubble>
-                {content.text}
+                {content}
                 {user.replyMessage && (
                   <>
                     <Divider/>
@@ -65,16 +78,16 @@ const ChatBox = props => {
             </div>
           </Dropdown>
           );
-        case 'image':
-        return (
-          <Dropdown overlay={menu} trigger={['contextMenu']} onContextMenu={() => setActionId(_id)}>
-            <div>
-              <Bubble type="image">
-                <img src={content.picUrl} alt="" />
-              </Bubble>
-            </div>
-          </Dropdown>
-        );
+      case 2:
+      return (
+        <Dropdown overlay={menu} trigger={['contextMenu']} onContextMenu={() => setActionId(_id)}>
+          <div>
+            <Bubble type="image">
+              <img src={content} alt="" />
+            </Bubble>
+          </div>
+        </Dropdown>
+      );
       default:
         return null;
     }
@@ -82,37 +95,44 @@ const ChatBox = props => {
 
   function handleSend(type, val) {
     audioRef.current.play();
+    let msg;
     
     switch (type) {
       case 'text':
         if (!val.trim()) break;
 
-        appendMsg({
-          type: 'text',
-          content: { text: val },
-          position: 'right',
-          user: { replyMessage },
+        msg = createMsgProtocal({
+          type: 1,
+          from: uid,
+          to: contactId,
+          content: val,
         });
-  
-        setTyping(true);
+        socketRef.current.emit(CHAT_TO, msg);
 
-        setTimeout(() => {
-          appendMsg({
-            type: 'text',
-            content: { text: 'Bala bala' },
-          });
-          setReplyMessage();
-        }, 1000);
+        appendMsg({
+          ...msg,
+          // type: 'text',
+          // content: { text: val },
+          // user: { replyMessage },
+          position: 'right',
+        });
         break;
       case 'image':
-        setTyping(true);
+        msg = createMsgProtocal({
+          type: 2,
+          from: uid,
+          to: contactId,
+          content: 'https://gimg2.baidu.com/image_search/src=http%3A%2F%2Fhbimg.b0.upaiyun.com%2F7f6dec72221bb589a322e9455d8bb5401ee5552269aa-BdmvBK_fw658&refer=http%3A%2F%2Fhbimg.b0.upaiyun.com&app=2002&size=f9999,10000&q=a80&n=0&g=0n&fmt=jpeg?sec=1628655638&t=89bebf53eb33e14aa430a72443259c3a',
+        });
+        socketRef.current.emit(CHAT_TO, msg);
 
-        setTimeout(() => {
-          appendMsg({
-            type: 'image',
-            content: { picUrl: 'https://gimg2.baidu.com/image_search/src=http%3A%2F%2Fhbimg.b0.upaiyun.com%2F7f6dec72221bb589a322e9455d8bb5401ee5552269aa-BdmvBK_fw658&refer=http%3A%2F%2Fhbimg.b0.upaiyun.com&app=2002&size=f9999,10000&q=a80&n=0&g=0n&fmt=jpeg?sec=1628655638&t=89bebf53eb33e14aa430a72443259c3a' }
-          });
-        }, 1000);
+        appendMsg({
+          ...msg,
+          // type: 'text',
+          // content: { text: val },
+          // user: { replyMessage },
+          position: 'right',
+        });
         break;
       default:
         break;
@@ -140,14 +160,14 @@ const ChatBox = props => {
     
     switch (action) {
       case 'copy':
-        clipboardRef.current = curActionMessage.content.text;
+        clipboardRef.current = curActionMessage.content;
         document.getElementById('clipboardBtn').click();
         break;
       case 'forward':
         setOpen(true);
         break;
       case 'reply':
-        setReplyMessage(curActionMessage.content.text);
+        setReplyMessage(curActionMessage.content);
         break;
       case 'multi':
         break;
@@ -161,6 +181,43 @@ const ChatBox = props => {
     setActionMessage();
     setForwardContacts([]);
   }
+
+  useEffect(() => {
+    socketRef.current = new IOClientSDK({
+      root: 'http://10.198.62.218:7001',
+      nsp: 'chat',
+      query: {
+        token: global.localStorage.getItem('token'),
+        userId: uid,
+        deviceType: 'desktop',
+      },
+    });
+
+    const errorEvent = socketRef.current.on(IMERROR, (resp) => {
+      console.error(resp);
+    });
+
+    const event1 = socketRef.current.on(CHAT_ONLINE, (resp) => {
+      console.log('我上线啦~', resp);
+    });
+
+    const event2 = socketRef.current.on(CHAT_MESSAGE, (resp) => {
+      console.log('收到的消息', resp);
+      const payload = resp.data.payload;
+      appendMsg(payload);
+    });
+
+    const event3 = socketRef.current.on(CHAT_TO_ACK, (resp) => {
+      console.log('发送成功~', resp);
+    });
+
+    return function cleanup() {
+      errorEvent();
+      event1();
+      event2();
+      event3();
+    }
+  } ,[appendMsg, uid]);
 
   useEffect(() => {
     resetList(JSON.parse(localStorage.getItem(contactId) || '[]'));

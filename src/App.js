@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Popover } from 'antd';
 
 import ChatBox from './chat-box';
-import ChatContactBox from './chat-contact-box';
+import ChatAgentBox from './chat-agent-box';
 
 import './App.css';
 import { Route } from 'react-router-dom';
@@ -24,8 +24,8 @@ function App() {
         </Popover>
       </Route>
 
-      <Route exact path="/contact/:uid">
-        <ChatContactBox />
+      <Route exact path="/agent/:uid">
+        <ChatAgentBox />
       </Route>
     </>
   );
