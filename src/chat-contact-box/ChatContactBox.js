@@ -1,23 +1,18 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { useParams } from "react-router-dom";
-import Chat, { Bubble, useMessages, LocaleProvider, ListItem } from '@chatui/core';
-
-import { CHAT_TO, CHAT_ONLINE, CHAT_MESSAGE, IMERROR, CHAT_TO_ACK, CHAT_PULL_RECENT_CONVERSATION, CHAT_PULL_OFFLINE_MESSAGE, CHAT_PULL_HISTORY_MESSAGE, CHAT_TO_READED, CHAT_GROUP_NOTICE, CHAT_TO_TYPING, CHAT_TO_UNDO } from '../client-sdk/constant';
-import IOClientSDK from '../client-sdk';
-import { createMsgProtocal } from '../client-sdk/protocal';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import Chat, { Bubble, useMessages, LocaleProvider, ListItem, Modal, CheckboxGroup, Divider } from '@chatui/core';
+import { Menu, Dropdown } from 'antd';
+import ClipboardJS from 'clipboard';
 
 import '@chatui/core/dist/index.css';
 import './chatui-theme.css';
 
 const ChatBox = props => {
   const { messages, appendMsg, resetList, setTyping } = useMessages([]);
-  const { uid } = useParams();
-  const socketRef = useRef();
 
   const toolbar = [
     { type: 'tel', title: 'Tel', icon: 'tel' },
   ];
-  const contacts = [
+  const defaultContacts = [
     { id: 1, name: 'Contact1' },
     { id: 2, name: 'Contact2' },
     { id: 3, name: 'Contact3' },
@@ -27,55 +22,58 @@ const ChatBox = props => {
   ];
   
   const audioRef = useRef();
+  const clipboardRef = useRef();
 
-  const [contactId, setContactId] = useState(null);
+  new ClipboardJS('#clipboardBtn', {
+    text: () => clipboardRef.current,
+  });
+  
+  const [open, setOpen] = useState(false);
+
+  const [contacts, setContacts] = useState(defaultContacts);
+  const [contactId, setContactId] = useState(defaultContacts[0]?.id);
   const [contactName, setContactName] = useState('Chat Room');
 
-  useEffect(() => {
-    socketRef.current = new IOClientSDK({
-      root: 'http://localhost:7001',
-      nsp: 'chat',
-      query: {
-        token: 'TOKEN',
-        userId: uid,
-        deviceType: 'desktop',
-      },
-    });
+  const [actionId, setActionId] = useState();
+  const [actionMessage, setActionMessage] = useState();
+  const [forwardContacts, setForwardContacts] = useState([]);
+  const [replyMessage, setReplyMessage] = useState();
 
-    const errorEvent = socketRef.current.on(IMERROR, (resp) => {
-      console.error(resp);
-    });
-
-    const event1 = socketRef.current.on(CHAT_ONLINE, (resp) => {
-      console.log('我上线啦~', resp);
-    });
-
-    const event2 = socketRef.current.on(CHAT_MESSAGE, (resp) => {
-      console.log('我收到了消息哟~', resp);
-    });
-
-    const event3 = socketRef.current.on(CHAT_TO_ACK, (resp) => {
-      console.log('发送成功~', resp);
-    });
-
-    return function cleanup() {
-      errorEvent();
-      event1();
-      event2();
-      event3();
-    }
-  } ,[]);
+  const contactOptions = useMemo(() => {
+    return contacts
+      .filter(item => item.id !== contactId)
+      .map(item => ({ label: item.name, value: item.id }));
+  }, [contactId, contacts]);
 
   function renderMessageContent(msg) {
-    const { type, content } = msg;
+    const { type, content, user, _id } = msg;
+
     switch (type) {
       case 'text':
-        return <Bubble content={content.text} />;
-      case 'image':
         return (
-          <Bubble type="image">
-            <img src={content.picUrl} alt="" />
-          </Bubble>
+          <Dropdown overlay={menu} trigger={['contextMenu']} onContextMenu={() => setActionId(_id)}>
+            <div>
+              <Bubble>
+                {content.text}
+                {user.replyMessage && (
+                  <>
+                    <Divider/>
+                    Reply to: {user.replyMessage}
+                  </>
+                )}
+              </Bubble>
+            </div>
+          </Dropdown>
+          );
+        case 'image':
+        return (
+          <Dropdown overlay={menu} trigger={['contextMenu']} onContextMenu={() => setActionId(_id)}>
+            <div>
+              <Bubble type="image">
+                <img src={content.picUrl} alt="" />
+              </Bubble>
+            </div>
+          </Dropdown>
         );
       default:
         return null;
@@ -93,6 +91,7 @@ const ChatBox = props => {
           type: 'text',
           content: { text: val },
           position: 'right',
+          user: { replyMessage },
         });
   
         setTyping(true);
@@ -102,11 +101,10 @@ const ChatBox = props => {
             type: 'text',
             content: { text: 'Bala bala' },
           });
+          setReplyMessage();
         }, 1000);
         break;
       case 'image':
-        console.log('file: ', val);
-        
         setTyping(true);
 
         setTimeout(() => {
@@ -122,20 +120,60 @@ const ChatBox = props => {
   }
 
   function handleToolbarClick({ type }) {
-    console.log(type);
+    console.log('handleToolbarClick', type);
   }
 
   function handleInputTypeChange(inputType) {
-    console.log(inputType);
+    console.log('handleInputTypeChange', inputType);
   }
 
-  function handleClickContact (item) {
+  function handleClickContact(item) {
     localStorage.setItem(contactId, JSON.stringify(messages));
     const { id, name } = item;
     setContactId(id);
     setContactName(name);
-    resetList(JSON.parse(localStorage.getItem(id) || '[]'));
   }
+
+  function handleMenuAction(action) {
+    const curActionMessage = messages.find(item => item._id === actionId);
+    setActionMessage(curActionMessage);
+    
+    switch (action) {
+      case 'copy':
+        clipboardRef.current = curActionMessage.content.text;
+        document.getElementById('clipboardBtn').click();
+        break;
+      case 'forward':
+        setOpen(true);
+        break;
+      case 'reply':
+        setReplyMessage(curActionMessage.content.text);
+        break;
+      case 'multi':
+        break;
+      default:
+        break;
+    }
+  }
+
+  function resetAction() {
+    setActionId();
+    setActionMessage();
+    setForwardContacts([]);
+  }
+
+  useEffect(() => {
+    resetList(JSON.parse(localStorage.getItem(contactId) || '[]'));
+  }, [contactId, resetList]);
+
+  const menu = (
+    <Menu>
+      <Menu.Item key="1" onClick={() => handleMenuAction('copy')}>Copy</Menu.Item>
+      <Menu.Item key="2" onClick={() => handleMenuAction('forward')}>Forward</Menu.Item>
+      <Menu.Item key="3" onClick={() => handleMenuAction('reply')}>Reply</Menu.Item>
+      <Menu.Item key="4" onClick={() => handleMenuAction('multi')}>Multi</Menu.Item>
+    </Menu>
+  );
 
   return (
     <LocaleProvider>
@@ -146,6 +184,42 @@ const ChatBox = props => {
         preload="auto"
         hidden
       />
+
+      <button id="clipboardBtn" data-clipboard-text="233333" hidden>2333</button>
+
+      <Modal
+        active={open}
+        title="Forward"
+        showClose={false}
+        backdrop="static"
+        actions={[
+          {
+            label: 'Confirm',
+            color: 'primary',
+            onClick: () => {
+              console.log('forward:', actionMessage, 'to:', forwardContacts);
+              setOpen(false);
+              resetAction();
+            },
+          },
+          {
+            label: 'Back',
+            onClick: () => {
+              setOpen(false);
+              resetAction();
+            },
+          },
+        ]}
+      >
+        <div style={{ padding: '0 15px' }}>
+          <CheckboxGroup
+            options={contactOptions}
+            value={forwardContacts}
+            block
+            onChange={(value) => setForwardContacts(value)}
+          />
+        </div>
+      </Modal>
 
       <div className="main-container">
         
