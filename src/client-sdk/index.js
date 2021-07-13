@@ -1,6 +1,8 @@
-import { connect } from 'mqtt';
+/* eslint-disable no-underscore-dangle */
+import io from 'socket.io-client';
 import {
   IMERROR,
+  SSO_QRLOGIN,
   CHAT_TO,
   CHAT_ONLINE,
   CHAT_MESSAGE,
@@ -25,27 +27,41 @@ class IOClientSDK {
   }
 
   initialize() {
+    // io is a Manager instance
+    // io options reference Manager
+    // https://socket.io/docs/client-api/#new-Manager-url-options
     const { root, nsp, ...otherOpts } = this.opts;
-    const url = `${root}`;
-    this.socket = connect(url, {
+    const url = `${root}/${nsp}`;
+    this.socket = io(url, {
+      path: '/ws', // matching with server
+      transports: ['websocket'],
       ...otherOpts,
     });
     // pretreatment some reserved event
     // eg: connect, disconnect, error
     this._bindReservedEvent();
-  // this._bindChatEvent();
+    if (nsp === 'sso') this._bindSSOEvent();
+    if (nsp === 'chat') this._bindChatEvent();
   }
 
   getSocket() {
     return this.socket;
   }
 
+  openSocket() {
+    return this.socket.open();
+  }
+
   closeSocket() {
-    return this.socket.end();
+    return this.socket.close();
+  }
+
+  destroySocket() {
+    return this.socket.destroy();
   }
 
   destroy() {
-    this.closeSocket();
+    this.destroySocket();
     this.socket = null;
     this.callback = null;
   }
@@ -70,7 +86,7 @@ class IOClientSDK {
   }
 
   emit(...args) {
-    return this.getSocket().publish(...args);
+    return this.getSocket().emit(...args);
   }
 
   _execQuene(eventName) {
@@ -90,26 +106,34 @@ class IOClientSDK {
     const self = this;
     socket.on('connect', (...resp) => {
       self._execQuene('connect')(...resp);
-      console.log('connected');
+      // feat: 拉取离线消息
+      self.emit(CHAT_PULL_OFFLINE_MESSAGE);
+      // feat: 拉取离线已读回执
+      self.emit(CHAT_PULL_READED_MESSAGE);
     });
 
-    socket.on('offline', (...resp) => {
-      self._execQuene('offline')(...resp);
-      console.log(...resp);
-    });
-
-    socket.on('close', (...resp) => {
-      self._execQuene('close')(...resp);
+    socket.on('disconnect', (...resp) => {
+      self._execQuene('disconnect')(...resp);
       console.log(...resp);
     });
 
     socket.on('error', (error) => {
       self._execQuene('error')(error);
-      console.error(error);
+      throw new Error(`[Socket Error 500] ${error}`);
     });
 
     socket.on(IMERROR, (error) => {
       self._execQuene(IMERROR)(error);
+    });
+  }
+
+  _bindSSOEvent() {
+    const socket = this.getSocket();
+    const self = this;
+    socket.on(SSO_QRLOGIN, (...resp) => {
+      self._execQuene(SSO_QRLOGIN)(...resp);
+      // feat: 成功登录后销毁连接
+      self.destroySocket();
     });
   }
 

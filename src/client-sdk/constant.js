@@ -2,6 +2,16 @@
 export const IMERROR = 'im_error';
 
 /**
+ * namespace: sso
+ */
+export const SSO = 'sso';
+
+/**
+ * PC 端扫码登录
+ */
+export const SSO_QRLOGIN = 'qrlogin';
+
+/**
  * namespace: chat
  */
 export const CHAT = 'chat';

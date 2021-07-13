@@ -12,7 +12,7 @@ function App() {
 
   return (
     <>
-      <Route exact path="/">
+      <Route exact path="/user/:uid">
         <Popover
           zIndex="1"
           placement="rightBottom"
@@ -24,7 +24,7 @@ function App() {
         </Popover>
       </Route>
 
-      <Route exact path="/contact">
+      <Route exact path="/contact/:uid">
         <ChatContactBox />
       </Route>
     </>

@@ -1,11 +1,18 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
+import { useParams } from "react-router-dom";
 import Chat, { Bubble, useMessages, LocaleProvider, ListItem } from '@chatui/core';
+
+import { CHAT_TO, CHAT_ONLINE, CHAT_MESSAGE, IMERROR, CHAT_TO_ACK, CHAT_PULL_RECENT_CONVERSATION, CHAT_PULL_OFFLINE_MESSAGE, CHAT_PULL_HISTORY_MESSAGE, CHAT_TO_READED, CHAT_GROUP_NOTICE, CHAT_TO_TYPING, CHAT_TO_UNDO } from '../client-sdk/constant';
+import IOClientSDK from '../client-sdk';
+import { createMsgProtocal } from '../client-sdk/protocal';
 
 import '@chatui/core/dist/index.css';
 import './chatui-theme.css';
 
 const ChatBox = props => {
   const { messages, appendMsg, resetList, setTyping } = useMessages([]);
+  const { uid } = useParams();
+  const socketRef = useRef();
 
   const toolbar = [
     { type: 'tel', title: 'Tel', icon: 'tel' },
@@ -24,9 +31,43 @@ const ChatBox = props => {
   const [contactId, setContactId] = useState(null);
   const [contactName, setContactName] = useState('Chat Room');
 
+  useEffect(() => {
+    socketRef.current = new IOClientSDK({
+      root: 'http://localhost:7001',
+      nsp: 'chat',
+      query: {
+        token: 'TOKEN',
+        userId: uid,
+        deviceType: 'desktop',
+      },
+    });
+
+    const errorEvent = socketRef.current.on(IMERROR, (resp) => {
+      console.error(resp);
+    });
+
+    const event1 = socketRef.current.on(CHAT_ONLINE, (resp) => {
+      console.log('我上线啦~', resp);
+    });
+
+    const event2 = socketRef.current.on(CHAT_MESSAGE, (resp) => {
+      console.log('我收到了消息哟~', resp);
+    });
+
+    const event3 = socketRef.current.on(CHAT_TO_ACK, (resp) => {
+      console.log('发送成功~', resp);
+    });
+
+    return function cleanup() {
+      errorEvent();
+      event1();
+      event2();
+      event3();
+    }
+  } ,[]);
+
   function renderMessageContent(msg) {
     const { type, content } = msg;
-
     switch (type) {
       case 'text':
         return <Bubble content={content.text} />;
