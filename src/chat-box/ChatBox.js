@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Chat, { Bubble, useMessages, LocaleProvider } from '@chatui/core';
 
 import '@chatui/core/dist/index.css';
@@ -13,9 +13,10 @@ const ChatBox = props => {
     leftContent: { icon: 'close', size: 'sm', onClick: onClose },
   };
   const toolbar = [
-    { type: 'voice', title: 'Voice', icon: 'mic' },
-    { type: 'text', title: 'Text', icon: 'keyboard' },
+    { type: 'tel', title: 'Tel', icon: 'tel' },
   ];
+
+  const [inputType, setInputType] = useState('text');
 
   function handleSend(type, val) {
     switch (type) {
@@ -71,19 +72,31 @@ const ChatBox = props => {
     }
   }
 
+  function handleToolbarClick({ type }) {
+    console.log(type)
+    setInputType(type);
+  }
+
+  function handleInputTypeChange(inputType) {
+    console.log(inputType);
+  }
+
   return (
     <LocaleProvider>
       <div className="chat-box">
         <Chat
           locale="en-US"
-          wideBreakpoint="100px"
+          wideBreakpoint="375px"
           placeholder="types"
           navbar={navBar}
           toolbar={toolbar}
+          inputType={inputType}
           messages={messages}
           renderMessageContent={renderMessageContent}
           onSend={handleSend}
           onImageSend={file => handleSend('image', file)}
+          onToolbarClick={handleToolbarClick}
+          onInputTypeChange={handleInputTypeChange}
         />
       </div>
     </LocaleProvider>
