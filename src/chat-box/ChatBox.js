@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams } from "react-router-dom";
 import Chat, { Bubble, useMessages, LocaleProvider, Divider, Tag } from '@chatui/core';
-import { Dropdown, Menu } from 'antd';
+import { Dropdown, Menu, Modal } from 'antd';
 import ClipboardJS from 'clipboard';
 
 import { CHAT_TO, CHAT_ONLINE, CHAT_MESSAGE, IMERROR, CHAT_TO_ACK, CHAT_TO_UNDO, CHAT_TO_READED } from '../client-sdk/constant';
@@ -15,7 +15,7 @@ const ChatBox = props => {
   const { uid } = useParams();
   const { onClose } = props;
   const { messages, appendMsg, updateMsg, deleteMsg } = useMessages([]);
-
+  const [videoVisable, setVideoVisable] = useState(false);
   const socketRef = useRef();
   const audioRef = useRef();
   const clipboardRef = useRef();
@@ -140,6 +140,12 @@ const ChatBox = props => {
   }
 
   function handleToolbarClick({ type }) {
+    if (type === 'tel') {
+      setVideoVisable(true);
+      setTimeout(() => {
+        global.rtcStart('room1', uid);
+      }, 300)
+    }
     console.log('handleToolbarClick', type);
   }
 
@@ -182,7 +188,7 @@ const ChatBox = props => {
 
   useEffect(() => {
     socketRef.current = new IOClientSDK({
-      root: 'http://10.198.62.218:7001',
+      root: 'wss://10.198.50.151:7003',
       nsp: 'chat',
       query: {
         token: global.localStorage.getItem('token'),
@@ -261,6 +267,12 @@ const ChatBox = props => {
           onInputTypeChange={handleInputTypeChange}
         />
       </div>
+      <Modal width="700px" title="Modal" visible={videoVisable} footer={null} onCancel={() => setVideoVisable(false)}>
+        <div style={{ display: 'flex', width: '100%', alignItems: 'center' }}>
+          <video style={{ width: '50%', padding: 8 }} id="remoteVideo" autoPlay playsInline></video>
+          <video style={{ width: '50%', padding: 8 }} id="localVideo" autoPlay playsInline muted></video>
+        </div>
+      </Modal>
     </LocaleProvider>
   );
 };

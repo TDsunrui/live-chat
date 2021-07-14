@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from "react-router-dom";
 import Chat, { Bubble, useMessages, LocaleProvider, ListItem, Modal, CheckboxGroup, Divider, Tag } from '@chatui/core';
-import { Menu, Dropdown } from 'antd';
+import { Menu, Dropdown, Modal as AntModal } from 'antd';
 import ClipboardJS from 'clipboard';
 
 import { CHAT_TO, CHAT_ONLINE, CHAT_MESSAGE, IMERROR, CHAT_TO_ACK, CHAT_TO_UNDO, CHAT_TO_READED } from '../client-sdk/constant';
@@ -13,7 +13,7 @@ import './chatui-theme.css';
 
 const ChatBox = props => {
   const { uid } = useParams();
-  
+  const [videoVisable, setVideoVisable] = useState(false);
   const { messages, appendMsg, updateMsg, deleteMsg, resetList } = useMessages([]);
 
   const toolbar = [
@@ -163,6 +163,12 @@ const ChatBox = props => {
   }
 
   function handleToolbarClick({ type }) {
+    if (type === 'tel') {
+      setVideoVisable(true);
+      setTimeout(() => {
+        global.rtcStart('room1', uid);
+      }, 1000)
+    }
     console.log('handleToolbarClick', type);
   }
 
@@ -224,7 +230,7 @@ const ChatBox = props => {
 
   useEffect(() => {
     socketRef.current = new IOClientSDK({
-      root: 'http://10.198.62.218:7001',
+      root: 'wss://10.198.50.151:7003',
       nsp: 'chat',
       query: {
         token: global.localStorage.getItem('token'),
@@ -365,6 +371,12 @@ const ChatBox = props => {
           />
         </div>
       </div>
+      <AntModal width="600px" title="On Call" visible={videoVisable} footer={null} onCancel={() => setVideoVisable(false)}>
+        <div style={{ display: 'flex', width: '100%', alignItems: 'center' }}>
+          <video style={{ width: '50%', padding: 8 }} id="remoteVideo" autoPlay playsInline></video>
+          <video style={{ width: '50%', padding: 8 }} id="localVideo" autoPlay playsInline muted></video>
+        </div>
+      </AntModal>
     </LocaleProvider>
   );
 };
